@@ -128,15 +128,15 @@ export interface backendInterface {
     checkAdminPassword(password: string): Promise<boolean>;
     deleteEnquiry(password: string, id: bigint): Promise<boolean>;
     deleteProduct(password: string, id: bigint): Promise<boolean>;
+    getAllStock(): Promise<Array<[bigint, bigint]>>;
     getEnquiries(password: string): Promise<Array<Enquiry>>;
     getProduct(id: bigint): Promise<Product | null>;
+    getProductStock(id: bigint): Promise<bigint>;
     getProducts(): Promise<Array<Product>>;
     seedProducts(password: string): Promise<boolean>;
+    setProductStock(password: string, id: bigint, quantity: bigint): Promise<boolean>;
     submitEnquiry(name: string, phone: string, message: string): Promise<bigint>;
     updateProduct(password: string, id: bigint, product: Product): Promise<boolean>;
-    setProductStock(password: string, id: bigint, quantity: bigint): Promise<boolean>;
-    getProductStock(id: bigint): Promise<bigint>;
-    getAllStock(): Promise<Array<[bigint, bigint]>>;
 }
 import type { Product as _Product, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -281,6 +281,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getAllStock(): Promise<Array<[bigint, bigint]>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllStock();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllStock();
+            return result;
+        }
+    }
     async getEnquiries(arg0: string): Promise<Array<Enquiry>> {
         if (this.processError) {
             try {
@@ -309,6 +323,20 @@ export class Backend implements backendInterface {
             return from_candid_opt_n8(this._uploadFile, this._downloadFile, result);
         }
     }
+    async getProductStock(arg0: bigint): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getProductStock(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getProductStock(arg0);
+            return result;
+        }
+    }
     async getProducts(): Promise<Array<Product>> {
         if (this.processError) {
             try {
@@ -334,6 +362,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.seedProducts(arg0);
+            return result;
+        }
+    }
+    async setProductStock(arg0: string, arg1: bigint, arg2: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.setProductStock(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.setProductStock(arg0, arg1, arg2);
             return result;
         }
     }
@@ -365,52 +407,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-
-    async setProductStock(arg0: string, arg1: bigint, arg2: bigint): Promise<boolean> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.setProductStock(arg0, arg1, arg2);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.setProductStock(arg0, arg1, arg2);
-            return result;
-        }
-    }
-
-    async getProductStock(arg0: bigint): Promise<bigint> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getProductStock(arg0);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getProductStock(arg0);
-            return result;
-        }
-    }
-
-    async getAllStock(): Promise<Array<[bigint, bigint]>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getAllStock();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getAllStock();
-            return result;
-        }
-    }
-
 }
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);

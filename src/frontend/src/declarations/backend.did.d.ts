@@ -58,15 +58,15 @@ export interface _SERVICE {
   'checkAdminPassword' : ActorMethod<[string], boolean>,
   'deleteEnquiry' : ActorMethod<[string, bigint], boolean>,
   'deleteProduct' : ActorMethod<[string, bigint], boolean>,
+  'getAllStock' : ActorMethod<[], Array<[bigint, bigint]>>,
   'getEnquiries' : ActorMethod<[string], Array<Enquiry>>,
   'getProduct' : ActorMethod<[bigint], [] | [Product]>,
+  'getProductStock' : ActorMethod<[bigint], bigint>,
   'getProducts' : ActorMethod<[], Array<Product>>,
   'seedProducts' : ActorMethod<[string], boolean>,
+  'setProductStock' : ActorMethod<[string, bigint, bigint], boolean>,
   'submitEnquiry' : ActorMethod<[string, string, string], bigint>,
   'updateProduct' : ActorMethod<[string, bigint, Product], boolean>,
-  'setProductStock' : ActorMethod<[string, bigint, bigint], boolean>,
-  'getProductStock' : ActorMethod<[bigint], bigint>,
-  'getAllStock' : ActorMethod<[], Array<[bigint, bigint]>>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

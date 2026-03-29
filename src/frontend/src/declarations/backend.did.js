@@ -68,15 +68,19 @@ export const idlService = IDL.Service({
   'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'deleteEnquiry' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'deleteProduct' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+  'getAllStock' : IDL.Func(
+      [],
+      [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
+      ['query'],
+    ),
   'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], []),
   'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
+  'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
   'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
-  'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
-  'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], []),
-  'getAllStock' : IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))], []),
 });
 
 export const idlInitArgs = [];
@@ -142,15 +146,19 @@ export const idlFactory = ({ IDL }) => {
     'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'deleteEnquiry' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
     'deleteProduct' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+    'getAllStock' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
+        ['query'],
+      ),
     'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], []),
     'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
+    'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
     'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
-    'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
-    'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], []),
-    'getAllStock' : IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))], []),
   });
 };
 

@@ -1,19 +1,23 @@
 # Vaibhav Enterprises
 
 ## Current State
-Enquiry form exists on the site but throws "Failed to send enquiry" error. The backend Motoko code has `submitEnquiry`, `getEnquiries`, `deleteEnquiry` functions but they are missing from the generated DID/bindings files, so the frontend cannot call them.
+Backend uses `mo:core/Map` with non-stable `var products`, `var enquiries`, and `var stockMap`. These are wiped on every redeployment. The `postupgrade` hook only restores from `stableProducts` legacy arrays which are never written to (no `preupgrade` hook), so data is permanently lost after every build.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Enquiry functions properly registered in backend bindings
+- Nothing new
 
 ### Modify
-- Regenerate backend with all enquiry functions (submitEnquiry, getEnquiries, deleteEnquiry) so frontend can call them
+- Rewrite backend to use `stable var products : [Product]`, `stable var enquiries : [Enquiry]`, `stable var stockEntries : [StockEntry]` as the primary storage
+- Use `mo:base/Array` and `mo:base/Time` instead of `mo:core`
+- Remove all non-stable maps and legacy migration code
 
 ### Remove
-- Nothing
+- Non-stable `var products`, `var enquiries`, `var stockMap` maps
+- Legacy `stableProducts`, `stableEnquiries`, `stableStockMap` backup arrays
+- `postupgrade` migration hook (no longer needed)
 
 ## Implementation Plan
-1. Regenerate Motoko backend including enquiry functions
-2. Frontend already has the enquiry form and admin enquiry tab wired up — just needs working bindings
+1. Backend already rewritten with stable arrays
+2. Deploy — data will now persist permanently across all redeployments
