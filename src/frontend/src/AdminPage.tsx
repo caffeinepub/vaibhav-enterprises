@@ -37,7 +37,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { HttpAgent } from "@icp-sdk/core/agent";
 import {
   Camera,
   Home,
@@ -55,9 +54,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "./backend.d.ts";
-import { loadConfig } from "./config";
 import { useActor } from "./hooks/useActor";
-import { StorageClient } from "./utils/StorageClient";
 
 interface Enquiry {
   id: bigint;
@@ -151,7 +148,13 @@ export default function AdminPage() {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      const [data] = await Promise.all([actor.getProducts(), fetchStock()]);
+      await fetchStock();
+      let data = await actor.getProducts();
+      // Retry up to 3 times with 2s delay if empty (ICP replica may lag)
+      for (let attempt = 0; attempt < 3 && data.length === 0; attempt++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        data = await actor.getProducts();
+      }
       setProducts(data);
     } catch {
       toast.error("Failed to load products");
@@ -273,26 +276,7 @@ export default function AdminPage() {
   };
 
   const uploadImageIfNeeded = async (imageUrl: string): Promise<string> => {
-    if (!imageUrl.startsWith("data:")) return imageUrl;
-    try {
-      const config = await loadConfig();
-      const agent = new HttpAgent({ host: config.backend_host });
-      const storageClient = new StorageClient(
-        config.bucket_name,
-        config.storage_gateway_url,
-        config.backend_canister_id,
-        config.project_id,
-        agent,
-      );
-      const base64Data = imageUrl.split(",")[1];
-      const bytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
-      const { hash } = await storageClient.putFile(bytes);
-      const url = await storageClient.getDirectURL(hash);
-      return url;
-    } catch (err) {
-      console.error("Image upload failed, saving without image", err);
-      return "";
-    }
+    return imageUrl; // base64 images stored directly as text
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -322,23 +306,30 @@ export default function AdminPage() {
         toast.success("Product updated!");
       } else {
         await actor.addProduct(pwd, productData);
-        // Find newly added product by highest id (ids are incrementing)
-        const updatedProducts = await actor.getProducts();
-        setProducts(updatedProducts);
-        if (updatedProducts.length > 0) {
-          const newProduct = updatedProducts.reduce((a, b) =>
-            a.id > b.id ? a : b,
-          );
-          await actor.setProductStock(
-            pwd,
-            newProduct.id,
-            BigInt(Number(formData.stockQty) || 0),
-          );
-        }
         toast.success("Product added!");
+        // Set stock separately so a stock failure doesn't block product save
+        try {
+          const updatedProducts = await actor.getProducts();
+          if (updatedProducts.length > 0) {
+            const newProduct = updatedProducts.reduce((a, b) =>
+              a.id > b.id ? a : b,
+            );
+            await actor.setProductStock(
+              pwd,
+              newProduct.id,
+              BigInt(Number(formData.stockQty) || 0),
+            );
+          }
+        } catch {
+          // Stock set failed but product was saved - non-fatal
+        }
       }
       setDialogOpen(false);
-      await Promise.all([fetchProducts(), fetchStock()]);
+      try {
+        await Promise.all([fetchProducts(), fetchStock()]);
+      } catch {
+        // refresh failed, non-fatal
+      }
     } catch {
       toast.error("Save failed. Please try again.");
     } finally {
@@ -509,11 +500,7 @@ export default function AdminPage() {
           value={activeTab}
           onValueChange={(v) => {
             setActiveTab(v);
-            if (
-              v === "enquiries" &&
-              enquiries.length === 0 &&
-              !loadingEnquiries
-            ) {
+            if (v === "enquiries" && !loadingEnquiries) {
               fetchEnquiries();
             }
           }}

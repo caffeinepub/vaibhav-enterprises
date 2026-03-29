@@ -332,9 +332,13 @@ function MainSite() {
         actor.getAllStock().catch(() => [] as [bigint, bigint][]),
       ]);
       let productList = data;
-      // Retry once if empty (canister may need a moment on first load)
-      if (productList.length === 0) {
-        await new Promise((r) => setTimeout(r, 1000));
+      // Retry up to 3 times with 2s delay if empty (ICP replica may lag)
+      for (
+        let attempt = 0;
+        attempt < 3 && productList.length === 0;
+        attempt++
+      ) {
+        await new Promise((r) => setTimeout(r, 2000));
         productList = await actor.getProducts();
       }
       setProducts(productList);
