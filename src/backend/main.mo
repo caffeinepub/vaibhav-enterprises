@@ -29,39 +29,60 @@ actor {
     createdAt : Int;
   };
 
-  // Stable storage — survives every redeploy
+  // Stable storage — survives every redeploy AND canister restart
   stable var stableProducts : [(Nat, Product)] = [];
   stable var nextId : Nat = 1;
   stable var stableEnquiries : [(Nat, Enquiry)] = [];
   stable var nextEnquiryId : Nat = 1;
   stable var stableStockMap : [(Nat, Nat)] = [];
 
-  // In-memory maps rebuilt from stable storage on startup
-  var products : Map.Map<Nat, Product> = Map.empty<Nat, Product>();
-  var enquiries : Map.Map<Nat, Enquiry> = Map.empty<Nat, Enquiry>();
-  var stockMap : Map.Map<Nat, Nat> = Map.empty<Nat, Nat>();
+  // Helper: build a Map from stable array
+  private func buildProductMap() : Map.Map<Nat, Product> {
+    let m = Map.empty<Nat, Product>();
+    for ((k, v) in stableProducts.vals()) {
+      m.add(k, v);
+    };
+    m
+  };
 
-  // Save to stable before upgrade
-  system func preupgrade() {
+  private func buildEnquiryMap() : Map.Map<Nat, Enquiry> {
+    let m = Map.empty<Nat, Enquiry>();
+    for ((k, v) in stableEnquiries.vals()) {
+      m.add(k, v);
+    };
+    m
+  };
+
+  private func buildStockMap() : Map.Map<Nat, Nat> {
+    let m = Map.empty<Nat, Nat>();
+    for ((k, v) in stableStockMap.vals()) {
+      m.add(k, v);
+    };
+    m
+  };
+
+  // In-memory maps rebuilt from stable storage on upgrade
+  var products : Map.Map<Nat, Product> = buildProductMap();
+  var enquiries : Map.Map<Nat, Enquiry> = buildEnquiryMap();
+  var stockMap : Map.Map<Nat, Nat> = buildStockMap();
+
+  // Keep stable arrays always in sync with in-memory maps
+  private func syncStable() {
     stableProducts := products.entries().toArray();
     stableEnquiries := enquiries.entries().toArray();
     stableStockMap := stockMap.entries().toArray();
   };
 
+  // Save to stable before upgrade
+  system func preupgrade() {
+    syncStable();
+  };
+
   // Restore from stable after upgrade
   system func postupgrade() {
-    for ((k, v) in stableProducts.vals()) {
-      products.add(k, v);
-    };
-    stableProducts := [];
-    for ((k, v) in stableEnquiries.vals()) {
-      enquiries.add(k, v);
-    };
-    stableEnquiries := [];
-    for ((k, v) in stableStockMap.vals()) {
-      stockMap.add(k, v);
-    };
-    stableStockMap := [];
+    products := buildProductMap();
+    enquiries := buildEnquiryMap();
+    stockMap := buildStockMap();
   };
 
   public shared ({ caller }) func checkAdminPassword(password : Text) : async Bool {
@@ -70,8 +91,10 @@ actor {
 
   public shared ({ caller }) func addProduct(password : Text, product : Product) : async Bool {
     if (password != "vaibhav@2210") return false;
-    products.add(nextId, { product with id = nextId });
+    let id = nextId;
+    products.add(id, { product with id });
     nextId += 1;
+    syncStable();
     true;
   };
 
@@ -81,6 +104,7 @@ actor {
       case (null) { false };
       case (_) {
         products.add(id, { product with id });
+        syncStable();
         true;
       };
     };
@@ -91,6 +115,7 @@ actor {
     if (products.containsKey(id)) {
       products.remove(id);
       stockMap.remove(id);
+      syncStable();
       true;
     } else {
       false;
@@ -110,6 +135,7 @@ actor {
   public shared ({ caller }) func setProductStock(password : Text, id : Nat, quantity : Nat) : async Bool {
     if (password != "vaibhav@2210") return false;
     stockMap.add(id, quantity);
+    syncStable();
     true;
   };
 
@@ -130,7 +156,8 @@ actor {
     let id = nextEnquiryId;
     enquiries.add(id, { id; name; phone; message; createdAt = 0 });
     nextEnquiryId += 1;
-    id;
+    syncStable();
+    id
   };
 
   public shared ({ caller }) func getEnquiries(password : Text) : async [Enquiry] {
@@ -142,6 +169,7 @@ actor {
     if (password != "vaibhav@2210") return false;
     if (enquiries.containsKey(id)) {
       enquiries.remove(id);
+      syncStable();
       true;
     } else {
       false;
@@ -150,6 +178,8 @@ actor {
 
   public shared ({ caller }) func seedProducts(password : Text) : async Bool {
     if (password != "vaibhav@2210") return false;
+    // Only seed if no products exist
+    if (products.size() > 0) return false;
 
     type RawProduct = {
       name : Text; brand : Text; category : Text;
@@ -174,6 +204,7 @@ actor {
       products.add(nextId, { raw with id = nextId });
       nextId += 1;
     };
+    syncStable();
     true;
   };
 };

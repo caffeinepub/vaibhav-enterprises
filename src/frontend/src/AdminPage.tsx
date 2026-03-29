@@ -37,8 +37,11 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { HttpAgent } from "@icp-sdk/core/agent";
 import {
+  Camera,
   Home,
+  ImageIcon,
   Inbox,
   Loader2,
   LogOut,
@@ -47,11 +50,14 @@ import {
   Plus,
   ShieldCheck,
   Trash2,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "./backend.d.ts";
+import { loadConfig } from "./config";
 import { useActor } from "./hooks/useActor";
+import { StorageClient } from "./utils/StorageClient";
 
 interface Enquiry {
   id: bigint;
@@ -266,11 +272,35 @@ export default function AdminPage() {
     setDialogOpen(true);
   };
 
+  const uploadImageIfNeeded = async (imageUrl: string): Promise<string> => {
+    if (!imageUrl.startsWith("data:")) return imageUrl;
+    try {
+      const config = await loadConfig();
+      const agent = new HttpAgent({ host: config.backend_host });
+      const storageClient = new StorageClient(
+        config.bucket_name,
+        config.storage_gateway_url,
+        config.backend_canister_id,
+        config.project_id,
+        agent,
+      );
+      const base64Data = imageUrl.split(",")[1];
+      const bytes = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+      const { hash } = await storageClient.putFile(bytes);
+      const url = await storageClient.getDirectURL(hash);
+      return url;
+    } catch (err) {
+      console.error("Image upload failed, saving without image", err);
+      return "";
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!actor) return;
     setSaving(true);
     const pwd = getAdminPassword();
+    const finalImageUrl = await uploadImageIfNeeded(formData.imageUrl.trim());
     const productData: Product = {
       id: editProduct ? editProduct.id : BigInt(0),
       name: formData.name.trim(),
@@ -279,7 +309,7 @@ export default function AdminPage() {
       price: BigInt(Math.round(Number(formData.price) || 0)),
       badge: formData.badge.trim(),
       description: formData.description.trim(),
-      imageUrl: formData.imageUrl.trim(),
+      imageUrl: finalImageUrl,
     };
     try {
       if (editProduct) {
@@ -957,16 +987,12 @@ export default function AdminPage() {
                 />
               </div>
               <div className="col-span-2">
-                <Label htmlFor="p-image">Image URL (optional)</Label>
-                <Input
-                  id="p-image"
-                  data-ocid="admin.product.image.input"
-                  placeholder="https://..."
+                <Label>Product Image</Label>
+                <ImageUploadField
                   value={formData.imageUrl}
-                  onChange={(e) =>
-                    setFormData((f) => ({ ...f, imageUrl: e.target.value }))
+                  onChange={(url) =>
+                    setFormData((f) => ({ ...f, imageUrl: url }))
                   }
-                  className="mt-1"
                 />
               </div>
             </div>
@@ -1040,6 +1066,146 @@ export default function AdminPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function ImageUploadField({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (url: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 600;
+      let w = img.width;
+      let h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) {
+          h = Math.round((h * MAX) / w);
+          w = MAX;
+        } else {
+          w = Math.round((w * MAX) / h);
+          h = MAX;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL("image/jpeg", 0.7);
+      onChange(compressed);
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.src = objectUrl;
+  }
+
+  function handleUrlSubmit() {
+    onChange(urlInput);
+    setShowUrlInput(false);
+    setUrlInput("");
+  }
+
+  function handleClear() {
+    onChange("");
+    setUrlInput("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  return (
+    <div className="mt-1 space-y-2">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleFileChange}
+        data-ocid="admin.product.upload_button"
+      />
+
+      {value ? (
+        <div className="relative inline-block">
+          <img
+            src={value}
+            alt="Product preview"
+            className="w-full max-h-40 object-cover rounded-lg border border-border"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleClear}
+            className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-2 flex items-center gap-1.5 text-sm text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            <Camera className="w-4 h-4" />
+            Change photo
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-lg py-6 hover:border-blue-400 hover:bg-blue-500/5 transition-all cursor-pointer min-h-[120px]"
+        >
+          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
+            Tap to upload photo
+          </span>
+          <span className="text-xs text-muted-foreground">
+            JPG, PNG, WEBP supported
+          </span>
+        </button>
+      )}
+
+      {!showUrlInput ? (
+        <button
+          type="button"
+          onClick={() => setShowUrlInput(true)}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+        >
+          Or enter image URL instead
+        </button>
+      ) : (
+        <div className="flex gap-2 items-center">
+          <Input
+            placeholder="https://..."
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            className="flex-1 text-sm"
+            data-ocid="admin.product.image.input"
+          />
+          <Button type="button" size="sm" onClick={handleUrlSubmit}>
+            Use
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowUrlInput(false)}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

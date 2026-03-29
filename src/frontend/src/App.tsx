@@ -27,7 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import AdminPage from "./AdminPage";
@@ -226,7 +226,13 @@ function ProductCard({
   product,
   index,
   onEnquire,
-}: { product: Product; index: number; onEnquire: (name: string) => void }) {
+  stockQty,
+}: {
+  product: Product;
+  index: number;
+  onEnquire: (name: string) => void;
+  stockQty?: number;
+}) {
   const fallback = getCategoryFallback(product.category);
   const src =
     !product.imageUrl || product.imageUrl.startsWith("https://example.com")
@@ -286,6 +292,19 @@ function ProductCard({
             Enquire
           </Button>
         </div>
+        {stockQty !== undefined && (
+          <div className="mt-2">
+            {stockQty === 0 ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">
+                Out of Stock
+              </span>
+            ) : (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                In Stock · {stockQty} pcs
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
@@ -300,18 +319,30 @@ function MainSite() {
   const [activeSection, setActiveSection] = useState("home");
   const [newsletter, setNewsletter] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [stockMap, setStockMap] = useState<Map<number, number>>(new Map());
 
   const fetchProducts = useCallback(async () => {
-    if (!actor) {
-      setLoadingProducts(false);
-      return;
-    }
+    if (!actor) return;
     setLoadingProducts(true);
     try {
-      const data = await actor.getProducts();
-      setProducts(data);
+      const [data, stockData] = await Promise.all([
+        actor.getProducts(),
+        actor.getAllStock().catch(() => [] as [bigint, bigint][]),
+      ]);
+      let productList = data;
+      // Retry once if empty (canister may need a moment on first load)
+      if (productList.length === 0) {
+        await new Promise((r) => setTimeout(r, 1000));
+        productList = await actor.getProducts();
+      }
+      setProducts(productList);
+      const map = new Map<number, number>();
+      for (const [id, qty] of stockData) {
+        map.set(Number(id), Number(qty));
+      }
+      setStockMap(map);
     } catch {
       // silently fail
     } finally {
@@ -820,6 +851,7 @@ function MainSite() {
                   product={product}
                   index={i}
                   onEnquire={handleAddToCart}
+                  stockQty={stockMap.get(Number(product.id))}
                 />
               ))}
             </div>
@@ -1385,11 +1417,58 @@ function MainSite() {
   );
 }
 
+class AdminErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#0a1628] flex items-center justify-center p-8">
+          <div className="bg-[#0f2040] border border-blue-900 rounded-xl p-8 max-w-lg w-full text-center shadow-xl">
+            <div className="text-red-400 text-5xl mb-4">⚠️</div>
+            <h2 className="text-white text-2xl font-bold mb-2">
+              Admin Panel Error
+            </h2>
+            <p className="text-blue-200 mb-6">
+              Admin panel failed to load. Please refresh the page.
+            </p>
+            {this.state.error && (
+              <pre className="text-left text-xs text-red-300 bg-black/30 rounded p-3 mb-6 overflow-auto max-h-40">
+                {this.state.error.message}
+              </pre>
+            )}
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const pathname = usePathname();
 
   if (pathname.startsWith("/admin")) {
-    return <AdminPage />;
+    return (
+      <AdminErrorBoundary>
+        <AdminPage />
+      </AdminErrorBoundary>
+    );
   }
 
   return <MainSite />;
