@@ -35,4 +35,7 @@ export interface backendInterface {
     seedProducts(password: string): Promise<boolean>;
     submitEnquiry(name: string, phone: string, message: string): Promise<bigint>;
     updateProduct(password: string, id: bigint, product: Product): Promise<boolean>;
+    setProductStock(password: string, id: bigint, quantity: bigint): Promise<boolean>;
+    getProductStock(id: bigint): Promise<bigint>;
+    getAllStock(): Promise<Array<[bigint, bigint]>>;
 }

@@ -51,6 +51,17 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "./backend.d.ts";
+import { useActor } from "./hooks/useActor";
+
+// Type helper for stock methods not yet in auto-generated backend.ts
+type StockActor = {
+  getAllStock(): Promise<Array<[bigint, bigint]>>;
+  setProductStock(
+    password: string,
+    id: bigint,
+    quantity: bigint,
+  ): Promise<boolean>;
+};
 
 interface Enquiry {
   id: bigint;
@@ -59,7 +70,6 @@ interface Enquiry {
   message: string;
   createdAt: bigint;
 }
-import { useActor } from "./hooks/useActor";
 
 const CATEGORIES = [
   "Fans",
@@ -80,6 +90,7 @@ type ProductFormData = {
   badge: string;
   description: string;
   imageUrl: string;
+  stockQty: string;
 };
 
 const EMPTY_FORM: ProductFormData = {
@@ -90,6 +101,7 @@ const EMPTY_FORM: ProductFormData = {
   badge: "",
   description: "",
   imageUrl: "",
+  stockQty: "0",
 };
 
 export default function AdminPage() {
@@ -102,6 +114,7 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [seedLoading, setSeedLoading] = useState(false);
+  const [stockMap, setStockMap] = useState<Record<string, number>>({});
 
   // Product dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -124,18 +137,34 @@ export default function AdminPage() {
   const getAdminPassword = () =>
     sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD;
 
+  // Cast actor to access stock methods (present in backend but not yet in generated bindings)
+
+  const fetchStock = useCallback(async () => {
+    if (!actor) return;
+    try {
+      const data = await (actor as unknown as StockActor).getAllStock();
+      const map: Record<string, number> = {};
+      for (const [id, qty] of data) {
+        map[id.toString()] = Number(qty);
+      }
+      setStockMap(map);
+    } catch {
+      // non-fatal, stock just won't show if backend doesn't have it yet
+    }
+  }, [actor]);
+
   const fetchProducts = useCallback(async () => {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      const data = await actor.getProducts();
+      const [data] = await Promise.all([actor.getProducts(), fetchStock()]);
       setProducts(data);
     } catch {
       toast.error("Failed to load products");
     } finally {
       setLoadingProducts(false);
     }
-  }, [actor]);
+  }, [actor, fetchStock]);
 
   const fetchEnquiries = useCallback(async () => {
     if (!actor) return;
@@ -179,7 +208,6 @@ export default function AdminPage() {
     e.preventDefault();
     setLoginLoading(true);
     try {
-      // Check password locally first - fast and reliable
       if (password === ADMIN_PASSWORD) {
         localStorage.setItem("adminLoggedIn", "true");
         sessionStorage.setItem("adminPassword", password);
@@ -187,7 +215,6 @@ export default function AdminPage() {
         toast.success("Welcome back!");
         return;
       }
-      // If not matching local password, try backend (for future password changes)
       if (actor) {
         const ok = await actor.checkAdminPassword(password);
         if (ok) {
@@ -213,6 +240,7 @@ export default function AdminPage() {
     sessionStorage.removeItem("adminPassword");
     setIsLoggedIn(false);
     setProducts([]);
+    setStockMap({});
   };
 
   const handleSeed = async () => {
@@ -245,6 +273,7 @@ export default function AdminPage() {
       badge: product.badge,
       description: product.description,
       imageUrl: product.imageUrl,
+      stockQty: (stockMap[product.id.toString()] ?? 0).toString(),
     });
     setDialogOpen(true);
   };
@@ -267,13 +296,31 @@ export default function AdminPage() {
     try {
       if (editProduct) {
         await actor.updateProduct(pwd, editProduct.id, productData);
+        await (actor as unknown as StockActor).setProductStock(
+          pwd,
+          editProduct.id,
+          BigInt(Number(formData.stockQty) || 0),
+        );
         toast.success("Product updated!");
       } else {
         await actor.addProduct(pwd, productData);
+        // Find newly added product by highest id (ids are incrementing)
+        const updatedProducts = await actor.getProducts();
+        setProducts(updatedProducts);
+        if (updatedProducts.length > 0) {
+          const newProduct = updatedProducts.reduce((a, b) =>
+            a.id > b.id ? a : b,
+          );
+          await (actor as unknown as StockActor).setProductStock(
+            pwd,
+            newProduct.id,
+            BigInt(Number(formData.stockQty) || 0),
+          );
+        }
         toast.success("Product added!");
       }
       setDialogOpen(false);
-      await fetchProducts();
+      await Promise.all([fetchProducts(), fetchStock()]);
     } catch {
       toast.error("Save failed. Please try again.");
     } finally {
@@ -487,7 +534,9 @@ export default function AdminPage() {
                 <p className="text-gray-500 text-sm mt-0.5">
                   {loadingProducts
                     ? "Loading..."
-                    : `${products.length} product${products.length !== 1 ? "s" : ""} total`}
+                    : `${products.length} product${
+                        products.length !== 1 ? "s" : ""
+                      } total`}
                 </p>
               </div>
               <div className="flex items-center gap-3">
@@ -583,76 +632,95 @@ export default function AdminPage() {
                         <TableHead className="font-semibold text-gray-700">
                           Badge
                         </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Stock
+                        </TableHead>
                         <TableHead className="font-semibold text-gray-700 text-right">
                           Actions
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {products.map((product, i) => (
-                        <TableRow
-                          key={product.id.toString()}
-                          data-ocid={`admin.products.row.${i + 1}`}
-                          className="hover:bg-gray-50"
-                        >
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <ProductThumb product={product} />
-                              <span className="font-medium text-gray-900 text-sm">
-                                {product.name}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-gray-600 text-sm">
-                            {product.brand}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="text-xs">
-                              {product.category}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-semibold text-gray-900">
-                            ₹{Number(product.price).toLocaleString("en-IN")}
-                          </TableCell>
-                          <TableCell>
-                            {product.badge ? (
-                              <Badge
-                                className="text-xs"
-                                style={{
-                                  backgroundColor: "oklch(0.65 0.11 191)",
-                                  color: "white",
-                                }}
-                              >
-                                {product.badge}
+                      {products.map((product, i) => {
+                        const qty = stockMap[product.id.toString()] ?? 0;
+                        return (
+                          <TableRow
+                            key={product.id.toString()}
+                            data-ocid={`admin.products.row.${i + 1}`}
+                            className="hover:bg-gray-50"
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <ProductThumb product={product} />
+                                <span className="font-medium text-gray-900 text-sm">
+                                  {product.name}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-gray-600 text-sm">
+                              {product.brand}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {product.category}
                               </Badge>
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                data-ocid={`admin.products.edit_button.${i + 1}`}
-                                onClick={() => openEdit(product)}
-                                className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                data-ocid={`admin.products.delete_button.${i + 1}`}
-                                onClick={() => setDeleteTarget(product)}
-                                className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell className="font-semibold text-gray-900">
+                              ₹{Number(product.price).toLocaleString("en-IN")}
+                            </TableCell>
+                            <TableCell>
+                              {product.badge ? (
+                                <Badge
+                                  className="text-xs"
+                                  style={{
+                                    backgroundColor: "oklch(0.65 0.11 191)",
+                                    color: "white",
+                                  }}
+                                >
+                                  {product.badge}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-300 text-xs">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {qty > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                                  {qty} pcs
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
+                                  Out of Stock
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-ocid={`admin.products.edit_button.${i + 1}`}
+                                  onClick={() => openEdit(product)}
+                                  className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  data-ocid={`admin.products.delete_button.${i + 1}`}
+                                  onClick={() => setDeleteTarget(product)}
+                                  className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -667,7 +735,9 @@ export default function AdminPage() {
                 <p className="text-gray-500 text-sm mt-0.5">
                   {loadingEnquiries
                     ? "Loading..."
-                    : `${enquiries.length} enquir${enquiries.length !== 1 ? "ies" : "y"} received`}
+                    : `${enquiries.length} enquir${
+                        enquiries.length !== 1 ? "ies" : "y"
+                      } received`}
                 </p>
               </div>
               <Button
@@ -865,6 +935,24 @@ export default function AdminPage() {
                   }
                   className="mt-1"
                 />
+              </div>
+              <div className="col-span-2">
+                <Label htmlFor="p-stock">Stock Quantity</Label>
+                <Input
+                  id="p-stock"
+                  data-ocid="admin.product.stock.input"
+                  type="number"
+                  placeholder="0"
+                  value={formData.stockQty}
+                  onChange={(e) =>
+                    setFormData((f) => ({ ...f, stockQty: e.target.value }))
+                  }
+                  min="0"
+                  className="mt-1"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Number of pieces available in stock
+                </p>
               </div>
               <div className="col-span-2">
                 <Label htmlFor="p-description">Description (optional)</Label>

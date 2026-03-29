@@ -34,15 +34,18 @@ actor {
   stable var nextId : Nat = 1;
   stable var stableEnquiries : [(Nat, Enquiry)] = [];
   stable var nextEnquiryId : Nat = 1;
+  stable var stableStockMap : [(Nat, Nat)] = [];
 
   // In-memory maps rebuilt from stable storage on startup
   var products : Map.Map<Nat, Product> = Map.empty<Nat, Product>();
   var enquiries : Map.Map<Nat, Enquiry> = Map.empty<Nat, Enquiry>();
+  var stockMap : Map.Map<Nat, Nat> = Map.empty<Nat, Nat>();
 
   // Save to stable before upgrade
   system func preupgrade() {
     stableProducts := products.entries().toArray();
     stableEnquiries := enquiries.entries().toArray();
+    stableStockMap := stockMap.entries().toArray();
   };
 
   // Restore from stable after upgrade
@@ -55,6 +58,10 @@ actor {
       enquiries.add(k, v);
     };
     stableEnquiries := [];
+    for ((k, v) in stableStockMap.vals()) {
+      stockMap.add(k, v);
+    };
+    stableStockMap := [];
   };
 
   public shared ({ caller }) func checkAdminPassword(password : Text) : async Bool {
@@ -83,6 +90,7 @@ actor {
     if (password != "vaibhav@2210") return false;
     if (products.containsKey(id)) {
       products.remove(id);
+      stockMap.remove(id);
       true;
     } else {
       false;
@@ -95,6 +103,25 @@ actor {
 
   public query ({ caller }) func getProduct(id : Nat) : async ?Product {
     products.get(id);
+  };
+
+  // ── Stock ──────────────────────────────────────────────────────────────────
+
+  public shared ({ caller }) func setProductStock(password : Text, id : Nat, quantity : Nat) : async Bool {
+    if (password != "vaibhav@2210") return false;
+    stockMap.add(id, quantity);
+    true;
+  };
+
+  public query ({ caller }) func getProductStock(id : Nat) : async Nat {
+    switch (stockMap.get(id)) {
+      case (?q) { q };
+      case (null) { 0 };
+    };
+  };
+
+  public query ({ caller }) func getAllStock() : async [(Nat, Nat)] {
+    stockMap.entries().toArray();
   };
 
   // ── Enquiries ──────────────────────────────────────────────────────────────
@@ -135,7 +162,7 @@ actor {
       { name = "Voltas Instant Geyser"; brand = "Voltas"; category = "Geysers"; price = 3500; badge = "Bestseller"; description = "Instant water heater."; imageUrl = "" },
       { name = "Voltas Storage Geyser 25L"; brand = "Voltas"; category = "Geysers"; price = 4999; badge = "Large Size"; description = "High-capacity water heater."; imageUrl = "" },
       { name = "Voltas Desert Cooler"; brand = "Voltas"; category = "Coolers"; price = 6500; badge = "Bestseller"; description = "Desert air cooler."; imageUrl = "" },
-      { name = "Indecool Personal Cooler"; brand = "Indecool"; category = "Coolers"; price = 2800; badge = "New Arrival"; description = "Compact personal cooler."; imageUrl = "" },
+      { name = "Pigeon Personal Cooler"; brand = "Pigeon"; category = "Coolers"; price = 2800; badge = "New Arrival"; description = "Compact personal cooler."; imageUrl = "" },
       { name = "Halonix LED Bulb 9W"; brand = "Halonix"; category = "Lights"; price = 120; badge = "Bestseller"; description = "Energy saving LED bulb."; imageUrl = "" },
       { name = "Halonix Panel Light"; brand = "Halonix"; category = "Lights"; price = 599; badge = "Sale"; description = "LED panel light."; imageUrl = "" },
       { name = "Pigeon Mixer Grinder"; brand = "Pigeon"; category = "Home Appliances"; price = 2200; badge = "Bestseller"; description = "3 jar mixer grinder."; imageUrl = "" },
