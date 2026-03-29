@@ -29,9 +29,18 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+
 import AdminPage from "./AdminPage";
 import type { Product } from "./backend.d.ts";
 import { useActor } from "./hooks/useActor";
+
+import halonixLogo from "../public/assets/generated/brand-halonix-logo.dim_300x150.png";
+import indecoolLogo from "../public/assets/generated/brand-indecool-logo.dim_300x150.png";
+import macawLogo from "../public/assets/generated/brand-macaw-logo.dim_300x150.png";
+import pigeonLogo from "../public/assets/generated/brand-pigeon-logo.dim_300x150.png";
+import varmoraLogo from "../public/assets/generated/brand-varmora-logo.dim_300x150.png";
+import voltasLogo from "../public/assets/generated/brand-voltas-logo.dim_300x150.png";
+import sarawagiLogo from "../public/assets/uploads/img-20230511-wa0048-019d3872-0898-7358-96fa-1133dd8da177-1.jpg";
 
 // ── Router ────────────────────────────────────────────────────────────────────
 // Simple pathname-based routing without needing react-router-dom
@@ -90,35 +99,49 @@ const BRANDS = [
     tagline: "By Stovekraft",
     products: "Cookers, Geysers, Appliances",
     color: "from-blue-700 to-blue-800",
-    logo: "/assets/generated/brand-pigeon-transparent.dim_200x200.png",
+    logo: pigeonLogo,
   },
   {
     name: "Voltas",
     tagline: "Tata Enterprise",
     products: "Geysers, Coolers, ACs",
     color: "from-blue-500 to-blue-600",
-    logo: "/assets/generated/brand-voltas-transparent.dim_200x200.png",
+    logo: voltasLogo,
   },
   {
     name: "Halonix",
     tagline: "Lighting Solutions",
     products: "LED Bulbs, Tube Lights, Panels",
     color: "from-yellow-500 to-yellow-600",
-    logo: "/assets/generated/brand-halonix-transparent.dim_200x200.png",
+    logo: halonixLogo,
   },
   {
     name: "Varmora",
     tagline: "Plastic Products",
     products: "Plastic Boxes, Containers, Storage",
     color: "from-purple-600 to-purple-700",
-    logo: "/assets/generated/brand-varmora-transparent.dim_200x200.png",
+    logo: varmoraLogo,
   },
   {
     name: "Sarawagi",
     tagline: "Think Better, Think Us",
     products: "Quality Products",
     color: "from-green-600 to-green-700",
-    logo: "/assets/uploads/img-20230511-wa0048-019d359c-fc34-7323-b484-bbdbd5745acf-2.jpg",
+    logo: sarawagiLogo,
+  },
+  {
+    name: "Macaw",
+    tagline: "Home Appliances",
+    products: "Fans, Coolers, Appliances",
+    color: "from-orange-500 to-orange-600",
+    logo: macawLogo,
+  },
+  {
+    name: "Indecool",
+    tagline: "Cooling Solutions",
+    products: "Air Coolers",
+    color: "from-cyan-600 to-cyan-700",
+    logo: indecoolLogo,
   },
 ];
 
@@ -285,11 +308,14 @@ function MainSite() {
   const [activeSection, setActiveSection] = useState("home");
   const [newsletter, setNewsletter] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [activeCategory, setActiveCategory] = useState("All");
 
   const fetchProducts = useCallback(async () => {
-    if (!actor) return;
+    if (!actor) {
+      setLoadingProducts(false);
+      return;
+    }
     setLoadingProducts(true);
     try {
       const data = await actor.getProducts();
@@ -662,6 +688,9 @@ function MainSite() {
                     src={brand.logo}
                     alt={brand.name}
                     className="w-full h-full object-contain p-1"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
                   />
                 </div>
                 <h3 className="font-bold text-navy text-lg mb-0.5">
