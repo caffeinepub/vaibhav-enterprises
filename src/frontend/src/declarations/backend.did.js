@@ -74,6 +74,9 @@ export const idlService = IDL.Service({
   'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
   'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
+  'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
+  'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], []),
+  'getAllStock' : IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))], []),
 });
 
 export const idlInitArgs = [];
@@ -145,6 +148,9 @@ export const idlFactory = ({ IDL }) => {
     'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
     'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
+    'setProductStock' : IDL.Func([IDL.Text, IDL.Nat, IDL.Nat], [IDL.Bool], []),
+    'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], []),
+    'getAllStock' : IDL.Func([], [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))], []),
   });
 };
 

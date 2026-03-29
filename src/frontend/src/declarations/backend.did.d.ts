@@ -64,6 +64,9 @@ export interface _SERVICE {
   'seedProducts' : ActorMethod<[string], boolean>,
   'submitEnquiry' : ActorMethod<[string, string, string], bigint>,
   'updateProduct' : ActorMethod<[string, bigint, Product], boolean>,
+  'setProductStock' : ActorMethod<[string, bigint, bigint], boolean>,
+  'getProductStock' : ActorMethod<[bigint], bigint>,
+  'getAllStock' : ActorMethod<[], Array<[bigint, bigint]>>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

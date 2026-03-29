@@ -53,16 +53,6 @@ import { toast } from "sonner";
 import type { Product } from "./backend.d.ts";
 import { useActor } from "./hooks/useActor";
 
-// Type helper for stock methods not yet in auto-generated backend.ts
-type StockActor = {
-  getAllStock(): Promise<Array<[bigint, bigint]>>;
-  setProductStock(
-    password: string,
-    id: bigint,
-    quantity: bigint,
-  ): Promise<boolean>;
-};
-
 interface Enquiry {
   id: bigint;
   name: string;
@@ -137,12 +127,10 @@ export default function AdminPage() {
   const getAdminPassword = () =>
     sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD;
 
-  // Cast actor to access stock methods (present in backend but not yet in generated bindings)
-
   const fetchStock = useCallback(async () => {
     if (!actor) return;
     try {
-      const data = await (actor as unknown as StockActor).getAllStock();
+      const data = await actor.getAllStock();
       const map: Record<string, number> = {};
       for (const [id, qty] of data) {
         map[id.toString()] = Number(qty);
@@ -296,7 +284,7 @@ export default function AdminPage() {
     try {
       if (editProduct) {
         await actor.updateProduct(pwd, editProduct.id, productData);
-        await (actor as unknown as StockActor).setProductStock(
+        await actor.setProductStock(
           pwd,
           editProduct.id,
           BigInt(Number(formData.stockQty) || 0),
@@ -311,7 +299,7 @@ export default function AdminPage() {
           const newProduct = updatedProducts.reduce((a, b) =>
             a.id > b.id ? a : b,
           );
-          await (actor as unknown as StockActor).setProductStock(
+          await actor.setProductStock(
             pwd,
             newProduct.id,
             BigInt(Number(formData.stockQty) || 0),
