@@ -35,7 +35,6 @@ import type { Product } from "./backend.d.ts";
 import { useActor } from "./hooks/useActor";
 
 import halonixLogo from "../public/assets/generated/brand-halonix-logo.dim_300x150.png";
-import indecoolLogo from "../public/assets/generated/brand-indecool-logo.dim_300x150.png";
 import macawLogo from "../public/assets/generated/brand-macaw-logo.dim_300x150.png";
 import pigeonLogo from "../public/assets/generated/brand-pigeon-logo.dim_300x150.png";
 import varmoraLogo from "../public/assets/generated/brand-varmora-logo.dim_300x150.png";
@@ -135,13 +134,6 @@ const BRANDS = [
     products: "Fans, Coolers, Appliances",
     color: "from-orange-500 to-orange-600",
     logo: macawLogo,
-  },
-  {
-    name: "Indecool",
-    tagline: "Cooling Solutions",
-    products: "Air Coolers",
-    color: "from-cyan-600 to-cyan-700",
-    logo: indecoolLogo,
   },
 ];
 
