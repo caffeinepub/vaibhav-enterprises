@@ -327,20 +327,10 @@ function MainSite() {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      const [data, stockData] = await Promise.all([
+      const [productList, stockData] = await Promise.all([
         actor.getProducts(),
         actor.getAllStock().catch(() => [] as [bigint, bigint][]),
       ]);
-      let productList = data;
-      // Retry up to 3 times with 2s delay if empty (ICP replica may lag)
-      for (
-        let attempt = 0;
-        attempt < 3 && productList.length === 0;
-        attempt++
-      ) {
-        await new Promise((r) => setTimeout(r, 2000));
-        productList = await actor.getProducts();
-      }
       setProducts(productList);
       const map = new Map<number, number>();
       for (const [id, qty] of stockData) {

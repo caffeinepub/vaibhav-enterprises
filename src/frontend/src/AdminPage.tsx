@@ -130,38 +130,26 @@ export default function AdminPage() {
   const getAdminPassword = () =>
     sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD;
 
-  const fetchStock = useCallback(async () => {
-    if (!actor) return;
-    try {
-      const data = await actor.getAllStock();
-      const map: Record<string, number> = {};
-      for (const [id, qty] of data) {
-        map[id.toString()] = Number(qty);
-      }
-      setStockMap(map);
-    } catch {
-      // non-fatal, stock just won't show if backend doesn't have it yet
-    }
-  }, [actor]);
-
   const fetchProducts = useCallback(async () => {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      await fetchStock();
-      let data = await actor.getProducts();
-      // Retry up to 3 times with 2s delay if empty (ICP replica may lag)
-      for (let attempt = 0; attempt < 3 && data.length === 0; attempt++) {
-        await new Promise((r) => setTimeout(r, 2000));
-        data = await actor.getProducts();
-      }
+      const [data, stockData] = await Promise.all([
+        actor.getProducts(),
+        actor.getAllStock().catch(() => [] as [bigint, bigint][]),
+      ]);
       setProducts(data);
+      const map: Record<string, number> = {};
+      for (const [id, qty] of stockData) {
+        map[id.toString()] = Number(qty);
+      }
+      setStockMap(map);
     } catch {
       toast.error("Failed to load products");
     } finally {
       setLoadingProducts(false);
     }
-  }, [actor, fetchStock]);
+  }, [actor]);
 
   const fetchEnquiries = useCallback(async () => {
     if (!actor) return;
@@ -306,12 +294,11 @@ export default function AdminPage() {
         toast.success("Product updated!");
       } else {
         await actor.addProduct(pwd, productData);
-        toast.success("Product added!");
-        // Set stock separately so a stock failure doesn't block product save
+        // Get the new product's id and set stock
         try {
-          const updatedProducts = await actor.getProducts();
-          if (updatedProducts.length > 0) {
-            const newProduct = updatedProducts.reduce((a, b) =>
+          const allProducts = await actor.getProducts();
+          if (allProducts.length > 0) {
+            const newProduct = allProducts.reduce((a, b) =>
               a.id > b.id ? a : b,
             );
             await actor.setProductStock(
@@ -323,13 +310,10 @@ export default function AdminPage() {
         } catch {
           // Stock set failed but product was saved - non-fatal
         }
+        toast.success("Product added!");
       }
       setDialogOpen(false);
-      try {
-        await Promise.all([fetchProducts(), fetchStock()]);
-      } catch {
-        // refresh failed, non-fatal
-      }
+      await fetchProducts();
     } catch {
       toast.error("Save failed. Please try again.");
     } finally {
