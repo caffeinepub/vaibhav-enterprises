@@ -35,9 +35,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Home,
+  Inbox,
   Loader2,
   LogOut,
   PackageSearch,
@@ -49,6 +51,14 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { Product } from "./backend.d.ts";
+
+interface Enquiry {
+  id: bigint;
+  name: string;
+  phone: string;
+  message: string;
+  createdAt: bigint;
+}
 import { useActor } from "./hooks/useActor";
 
 const CATEGORIES = [
@@ -103,6 +113,14 @@ export default function AdminPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Enquiries
+  const [activeTab, setActiveTab] = useState("products");
+  const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
+  const [loadingEnquiries, setLoadingEnquiries] = useState(false);
+  const [deletingEnquiryId, setDeletingEnquiryId] = useState<bigint | null>(
+    null,
+  );
+
   const getAdminPassword = () =>
     sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD;
 
@@ -119,11 +137,43 @@ export default function AdminPage() {
     }
   }, [actor]);
 
+  const fetchEnquiries = useCallback(async () => {
+    if (!actor) return;
+    setLoadingEnquiries(true);
+    try {
+      const data = await actor.getEnquiries(
+        sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD,
+      );
+      setEnquiries(data);
+    } catch {
+      toast.error("Failed to load enquiries");
+    } finally {
+      setLoadingEnquiries(false);
+    }
+  }, [actor]);
+
   useEffect(() => {
     if (isLoggedIn && actor && !isFetching) {
       fetchProducts();
     }
   }, [isLoggedIn, actor, isFetching, fetchProducts]);
+
+  const handleDeleteEnquiry = async (id: bigint) => {
+    if (!actor) return;
+    setDeletingEnquiryId(id);
+    try {
+      await actor.deleteEnquiry(
+        sessionStorage.getItem("adminPassword") || ADMIN_PASSWORD,
+        id,
+      );
+      setEnquiries((prev) => prev.filter((e) => e.id !== id));
+      toast.success("Enquiry deleted");
+    } catch {
+      toast.error("Failed to delete enquiry");
+    } finally {
+      setDeletingEnquiryId(null);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,184 +440,339 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats + Actions Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Products</h2>
-            <p className="text-gray-500 text-sm mt-0.5">
-              {loadingProducts
-                ? "Loading..."
-                : `${products.length} product${products.length !== 1 ? "s" : ""} total`}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {products.length === 0 && !loadingProducts && (
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => {
+            setActiveTab(v);
+            if (
+              v === "enquiries" &&
+              enquiries.length === 0 &&
+              !loadingEnquiries
+            ) {
+              fetchEnquiries();
+            }
+          }}
+          className="w-full"
+        >
+          <TabsList
+            className="mb-8 h-auto p-1"
+            style={{ backgroundColor: "oklch(0.92 0.02 236)" }}
+          >
+            <TabsTrigger
+              value="products"
+              data-ocid="admin.products.tab"
+              className="gap-2 data-[state=active]:text-white"
+              style={{
+                ["--tw-data-active-bg" as string]: "oklch(0.30 0.072 236)",
+              }}
+            >
+              <PackageSearch className="w-4 h-4" />
+              Products
+            </TabsTrigger>
+            <TabsTrigger
+              value="enquiries"
+              data-ocid="admin.enquiries.tab"
+              className="gap-2"
+            >
+              <Inbox className="w-4 h-4" />
+              Enquiries
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="products">
+            {/* Stats + Actions Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Products</h2>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  {loadingProducts
+                    ? "Loading..."
+                    : `${products.length} product${products.length !== 1 ? "s" : ""} total`}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {products.length === 0 && !loadingProducts && (
+                  <Button
+                    variant="outline"
+                    data-ocid="admin.seed.button"
+                    onClick={handleSeed}
+                    disabled={seedLoading}
+                  >
+                    {seedLoading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <PackageSearch className="mr-2 h-4 w-4" />
+                    )}
+                    Seed Products
+                  </Button>
+                )}
+                <Button
+                  data-ocid="admin.add_product.open_modal_button"
+                  onClick={openAdd}
+                  style={{
+                    backgroundColor: "oklch(0.30 0.072 236)",
+                    color: "white",
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Product
+                </Button>
+              </div>
+            </div>
+
+            {/* Products Table */}
+            {loadingProducts ? (
+              <div
+                className="flex items-center justify-center h-64"
+                data-ocid="admin.products.loading_state"
+              >
+                <Loader2
+                  className="h-8 w-8 animate-spin"
+                  style={{ color: "oklch(0.30 0.072 236)" }}
+                />
+              </div>
+            ) : products.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center h-64 text-center"
+                data-ocid="admin.products.empty_state"
+              >
+                <PackageSearch className="w-12 h-12 text-gray-300 mb-4" />
+                <h3 className="font-semibold text-gray-600 mb-1">
+                  No products yet
+                </h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Add your first product or seed with sample data.
+                </p>
+                <Button
+                  onClick={handleSeed}
+                  disabled={seedLoading}
+                  style={{
+                    backgroundColor: "oklch(0.30 0.072 236)",
+                    color: "white",
+                  }}
+                >
+                  {seedLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <PackageSearch className="mr-2 h-4 w-4" />
+                  )}
+                  Seed Sample Products
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+                data-ocid="admin.products.table"
+              >
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold text-gray-700">
+                          Product
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Brand
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Category
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Price
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Badge
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-right">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {products.map((product, i) => (
+                        <TableRow
+                          key={product.id.toString()}
+                          data-ocid={`admin.products.row.${i + 1}`}
+                          className="hover:bg-gray-50"
+                        >
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <ProductThumb product={product} />
+                              <span className="font-medium text-gray-900 text-sm">
+                                {product.name}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-gray-600 text-sm">
+                            {product.brand}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {product.category}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-semibold text-gray-900">
+                            ₹{Number(product.price).toLocaleString("en-IN")}
+                          </TableCell>
+                          <TableCell>
+                            {product.badge ? (
+                              <Badge
+                                className="text-xs"
+                                style={{
+                                  backgroundColor: "oklch(0.65 0.11 191)",
+                                  color: "white",
+                                }}
+                              >
+                                {product.badge}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-300 text-xs">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-ocid={`admin.products.edit_button.${i + 1}`}
+                                onClick={() => openEdit(product)}
+                                className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                data-ocid={`admin.products.delete_button.${i + 1}`}
+                                onClick={() => setDeleteTarget(product)}
+                                className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="enquiries">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Enquiries</h2>
+                <p className="text-gray-500 text-sm mt-0.5">
+                  {loadingEnquiries
+                    ? "Loading..."
+                    : `${enquiries.length} enquir${enquiries.length !== 1 ? "ies" : "y"} received`}
+                </p>
+              </div>
               <Button
                 variant="outline"
-                data-ocid="admin.seed.button"
-                onClick={handleSeed}
-                disabled={seedLoading}
+                onClick={fetchEnquiries}
+                disabled={loadingEnquiries}
+                data-ocid="admin.enquiries.refresh.button"
               >
-                {seedLoading ? (
+                {loadingEnquiries ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <PackageSearch className="mr-2 h-4 w-4" />
+                  <Inbox className="mr-2 h-4 w-4" />
                 )}
-                Seed Products
+                Refresh
               </Button>
-            )}
-            <Button
-              data-ocid="admin.add_product.open_modal_button"
-              onClick={openAdd}
-              style={{
-                backgroundColor: "oklch(0.30 0.072 236)",
-                color: "white",
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Product
-            </Button>
-          </div>
-        </div>
-
-        {/* Products Table */}
-        {loadingProducts ? (
-          <div
-            className="flex items-center justify-center h-64"
-            data-ocid="admin.products.loading_state"
-          >
-            <Loader2
-              className="h-8 w-8 animate-spin"
-              style={{ color: "oklch(0.30 0.072 236)" }}
-            />
-          </div>
-        ) : products.length === 0 ? (
-          <div
-            className="flex flex-col items-center justify-center h-64 text-center"
-            data-ocid="admin.products.empty_state"
-          >
-            <PackageSearch className="w-12 h-12 text-gray-300 mb-4" />
-            <h3 className="font-semibold text-gray-600 mb-1">
-              No products yet
-            </h3>
-            <p className="text-gray-400 text-sm mb-4">
-              Add your first product or seed with sample data.
-            </p>
-            <Button
-              onClick={handleSeed}
-              disabled={seedLoading}
-              style={{
-                backgroundColor: "oklch(0.30 0.072 236)",
-                color: "white",
-              }}
-            >
-              {seedLoading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <PackageSearch className="mr-2 h-4 w-4" />
-              )}
-              Seed Sample Products
-            </Button>
-          </div>
-        ) : (
-          <div
-            className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
-            data-ocid="admin.products.table"
-          >
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-gray-50">
-                    <TableHead className="font-semibold text-gray-700">
-                      Product
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-700">
-                      Brand
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-700">
-                      Category
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-700">
-                      Price
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-700">
-                      Badge
-                    </TableHead>
-                    <TableHead className="font-semibold text-gray-700 text-right">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((product, i) => (
-                    <TableRow
-                      key={product.id.toString()}
-                      data-ocid={`admin.products.row.${i + 1}`}
-                      className="hover:bg-gray-50"
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <ProductThumb product={product} />
-                          <span className="font-medium text-gray-900 text-sm">
-                            {product.name}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-gray-600 text-sm">
-                        {product.brand}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {product.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-semibold text-gray-900">
-                        ₹{Number(product.price).toLocaleString("en-IN")}
-                      </TableCell>
-                      <TableCell>
-                        {product.badge ? (
-                          <Badge
-                            className="text-xs"
-                            style={{
-                              backgroundColor: "oklch(0.65 0.11 191)",
-                              color: "white",
-                            }}
-                          >
-                            {product.badge}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-300 text-xs">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            data-ocid={`admin.products.edit_button.${i + 1}`}
-                            onClick={() => openEdit(product)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-blue-600"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            data-ocid={`admin.products.delete_button.${i + 1}`}
-                            onClick={() => setDeleteTarget(product)}
-                            className="h-8 w-8 p-0 text-gray-500 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
             </div>
-          </div>
-        )}
+
+            {loadingEnquiries ? (
+              <div
+                className="flex items-center justify-center h-64"
+                data-ocid="admin.enquiries.loading_state"
+              >
+                <Loader2
+                  className="h-8 w-8 animate-spin"
+                  style={{ color: "oklch(0.30 0.072 236)" }}
+                />
+              </div>
+            ) : enquiries.length === 0 ? (
+              <div
+                className="flex flex-col items-center justify-center h-64 text-center"
+                data-ocid="admin.enquiries.empty_state"
+              >
+                <Inbox className="w-12 h-12 text-gray-300 mb-4" />
+                <h3 className="font-semibold text-gray-600 mb-1">
+                  No enquiries yet
+                </h3>
+                <p className="text-gray-400 text-sm">
+                  Enquiries from the website will appear here.
+                </p>
+              </div>
+            ) : (
+              <div
+                className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+                data-ocid="admin.enquiries.table"
+              >
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-gray-50">
+                        <TableHead className="font-semibold text-gray-700">
+                          Name
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Phone
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700">
+                          Message
+                        </TableHead>
+                        <TableHead className="font-semibold text-gray-700 text-right">
+                          Actions
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enquiries.map((enquiry, i) => (
+                        <TableRow
+                          key={enquiry.id.toString()}
+                          data-ocid={`admin.enquiries.row.item.${i + 1}`}
+                        >
+                          <TableCell className="font-medium text-gray-900 whitespace-nowrap">
+                            {enquiry.name}
+                          </TableCell>
+                          <TableCell className="text-gray-600 whitespace-nowrap">
+                            {enquiry.phone}
+                          </TableCell>
+                          <TableCell className="text-gray-600 max-w-xs">
+                            <p className="truncate max-w-xs">
+                              {enquiry.message}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-ocid={`admin.enquiries.delete_button.${i + 1}`}
+                              onClick={() => handleDeleteEnquiry(enquiry.id)}
+                              disabled={deletingEnquiryId === enquiry.id}
+                              className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {deletingEnquiryId === enquiry.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </main>
 
       {/* Add/Edit Product Dialog */}

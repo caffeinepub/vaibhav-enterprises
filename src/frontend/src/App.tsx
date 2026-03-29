@@ -281,6 +281,7 @@ function MainSite() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [form, setForm] = useState({ name: "", phone: "", message: "" });
+  const [submitting, setSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState("home");
   const [newsletter, setNewsletter] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
@@ -333,10 +334,22 @@ function MainSite() {
     toast.success(`${name} added to enquiry list!`);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Your enquiry has been sent! We'll contact you shortly.");
-    setForm({ name: "", phone: "", message: "" });
+    if (!actor) {
+      toast.error("Unable to connect. Please try again.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await actor.submitEnquiry(form.name, form.phone, form.message);
+      toast.success("Your enquiry has been sent! We'll contact you shortly.");
+      setForm({ name: "", phone: "", message: "" });
+    } catch {
+      toast.error("Failed to send enquiry. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleNewsletterSubmit = (e: React.FormEvent) => {
@@ -793,6 +806,116 @@ function MainSite() {
         </div>
       </section>
 
+      {/* Enquiry */}
+      <section
+        id="enquiry"
+        className="py-16"
+        style={{
+          background:
+            "linear-gradient(135deg, oklch(0.22 0.065 236), oklch(0.45 0.14 236))",
+        }}
+      >
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <p
+              className="text-sm font-semibold uppercase tracking-widest mb-2"
+              style={{ color: "oklch(0.72 0.06 236)" }}
+            >
+              Get In Touch
+            </p>
+            <h2 className="text-3xl font-bold text-white">Send an Enquiry</h2>
+            <p className="text-gray-300 mt-2 text-sm">
+              Interested in a product? Fill in the details and we'll get back to
+              you soon.
+            </p>
+          </div>
+          <div
+            className="rounded-2xl p-8"
+            style={{
+              backgroundColor: "oklch(0.28 0.07 236)",
+              border: "1px solid oklch(0.4 0.1 236)",
+            }}
+          >
+            <form
+              onSubmit={handleFormSubmit}
+              className="space-y-5"
+              data-ocid="enquiry.form"
+            >
+              <div>
+                <label
+                  htmlFor="enquiry-name"
+                  className="block text-sm font-medium text-gray-200 mb-1.5"
+                >
+                  Your Name
+                </label>
+                <Input
+                  id="enquiry-name"
+                  data-ocid="enquiry.input"
+                  className="text-white"
+                  placeholder="e.g. Rajesh Kumar"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="enquiry-phone"
+                  className="block text-sm font-medium text-gray-200 mb-1.5"
+                >
+                  Phone Number
+                </label>
+                <Input
+                  id="enquiry-phone"
+                  data-ocid="enquiry.input"
+                  className="text-white"
+                  placeholder="+91 XXXXX XXXXX"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phone: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="enquiry-message"
+                  className="block text-sm font-medium text-gray-200 mb-1.5"
+                >
+                  Message / Product Enquiry
+                </label>
+                <Textarea
+                  id="enquiry-message"
+                  data-ocid="enquiry.textarea"
+                  className="text-white"
+                  placeholder="Tell us what you're looking for..."
+                  rows={4}
+                  value={form.message}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, message: e.target.value }))
+                  }
+                  required
+                />
+              </div>
+              <Button
+                type="submit"
+                data-ocid="enquiry.submit_button"
+                className="w-full font-semibold py-2.5"
+                disabled={submitting}
+                style={{
+                  backgroundColor: "oklch(0.45 0.14 236)",
+                  color: "white",
+                }}
+              >
+                {submitting ? "Sending..." : "Send Enquiry"}
+              </Button>
+            </form>
+          </div>
+        </div>
+      </section>
+
       {/* About */}
       <section id="about" className="py-0 overflow-hidden">
         <div className="grid lg:grid-cols-2 min-h-[480px]">
@@ -984,8 +1107,8 @@ function MainSite() {
             </p>
             <h2 className="text-3xl font-bold text-white">Contact Us</h2>
           </div>
-          <div className="grid lg:grid-cols-2 gap-12">
-            <div>
+          <div>
+            <div className="max-w-lg mx-auto">
               <h3 className="font-bold text-white text-xl mb-6">
                 Visit Our Store
               </h3>
@@ -1065,90 +1188,6 @@ function MainSite() {
                 </p>
                 <p className="text-gray-300 text-sm">Sunday: Closed</p>
               </div>
-            </div>
-
-            <div
-              className="rounded-2xl p-8"
-              style={{
-                backgroundColor: "oklch(0.28 0.07 236)",
-                border: "1px solid oklch(0.4 0.1 236)",
-              }}
-            >
-              <h3 className="font-bold text-white text-xl mb-6">
-                Send an Enquiry
-              </h3>
-              <form
-                onSubmit={handleFormSubmit}
-                className="space-y-5"
-                data-ocid="contact.form"
-              >
-                <div>
-                  <label
-                    htmlFor="contact-name"
-                    className="block text-sm font-medium text-gray-200 mb-1.5"
-                  >
-                    Your Name
-                  </label>
-                  <Input
-                    id="contact-name"
-                    data-ocid="contact.name.input"
-                    placeholder="e.g. Rajesh Kumar"
-                    value={form.name}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, name: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="contact-phone"
-                    className="block text-sm font-medium text-gray-200 mb-1.5"
-                  >
-                    Phone Number
-                  </label>
-                  <Input
-                    id="contact-phone"
-                    data-ocid="contact.phone.input"
-                    placeholder="+91 XXXXX XXXXX"
-                    value={form.phone}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, phone: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="contact-message"
-                    className="block text-sm font-medium text-gray-200 mb-1.5"
-                  >
-                    Message / Product Enquiry
-                  </label>
-                  <Textarea
-                    id="contact-message"
-                    data-ocid="contact.message.textarea"
-                    placeholder="Tell us what you're looking for..."
-                    rows={4}
-                    value={form.message}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, message: e.target.value }))
-                    }
-                    required
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  data-ocid="contact.submit_button"
-                  className="w-full font-semibold py-2.5"
-                  style={{
-                    backgroundColor: "oklch(0.45 0.14 236)",
-                    color: "white",
-                  }}
-                >
-                  Send Enquiry
-                </Button>
-              </form>
             </div>
           </div>
         </div>

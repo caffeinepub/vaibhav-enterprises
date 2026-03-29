@@ -29,6 +29,13 @@ export const Product = IDL.Record({
   'brand' : IDL.Text,
   'price' : IDL.Nat,
 });
+export const Enquiry = IDL.Record({
+  'id' : IDL.Nat,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'message' : IDL.Text,
+  'phone' : IDL.Text,
+});
 
 export const idlService = IDL.Service({
   '_caffeineStorageBlobIsLive' : IDL.Func(
@@ -59,10 +66,13 @@ export const idlService = IDL.Service({
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   'addProduct' : IDL.Func([IDL.Text, Product], [IDL.Bool], []),
   'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'deleteEnquiry' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'deleteProduct' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+  'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], []),
   'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
   'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
   'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
 });
 
@@ -89,6 +99,13 @@ export const idlFactory = ({ IDL }) => {
     'badge' : IDL.Text,
     'brand' : IDL.Text,
     'price' : IDL.Nat,
+  });
+  const Enquiry = IDL.Record({
+    'id' : IDL.Nat,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'message' : IDL.Text,
+    'phone' : IDL.Text,
   });
   
   return IDL.Service({
@@ -120,10 +137,13 @@ export const idlFactory = ({ IDL }) => {
     '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
     'addProduct' : IDL.Func([IDL.Text, Product], [IDL.Bool], []),
     'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'deleteEnquiry' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
     'deleteProduct' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
+    'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], []),
     'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
     'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
     'seedProducts' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'submitEnquiry' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Nat], []),
     'updateProduct' : IDL.Func([IDL.Text, IDL.Nat, Product], [IDL.Bool], []),
   });
 };

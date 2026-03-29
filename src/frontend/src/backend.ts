@@ -103,6 +103,13 @@ export interface _CaffeineStorageCreateCertificateResult {
     method: string;
     blob_hash: string;
 }
+export interface Enquiry {
+    id: bigint;
+    name: string;
+    createdAt: bigint;
+    message: string;
+    phone: string;
+}
 export interface _CaffeineStorageRefillResult {
     success?: boolean;
     topped_up_amount?: bigint;
@@ -119,10 +126,13 @@ export interface backendInterface {
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
     addProduct(password: string, product: Product): Promise<boolean>;
     checkAdminPassword(password: string): Promise<boolean>;
+    deleteEnquiry(password: string, id: bigint): Promise<boolean>;
     deleteProduct(password: string, id: bigint): Promise<boolean>;
+    getEnquiries(password: string): Promise<Array<Enquiry>>;
     getProduct(id: bigint): Promise<Product | null>;
     getProducts(): Promise<Array<Product>>;
     seedProducts(password: string): Promise<boolean>;
+    submitEnquiry(name: string, phone: string, message: string): Promise<bigint>;
     updateProduct(password: string, id: bigint, product: Product): Promise<boolean>;
 }
 import type { Product as _Product, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
@@ -240,6 +250,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async deleteEnquiry(arg0: string, arg1: bigint): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deleteEnquiry(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deleteEnquiry(arg0, arg1);
+            return result;
+        }
+    }
     async deleteProduct(arg0: string, arg1: bigint): Promise<boolean> {
         if (this.processError) {
             try {
@@ -251,6 +275,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.deleteProduct(arg0, arg1);
+            return result;
+        }
+    }
+    async getEnquiries(arg0: string): Promise<Array<Enquiry>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getEnquiries(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getEnquiries(arg0);
             return result;
         }
     }
@@ -293,6 +331,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.seedProducts(arg0);
+            return result;
+        }
+    }
+    async submitEnquiry(arg0: string, arg1: string, arg2: string): Promise<bigint> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.submitEnquiry(arg0, arg1, arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.submitEnquiry(arg0, arg1, arg2);
             return result;
         }
     }

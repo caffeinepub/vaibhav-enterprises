@@ -17,12 +17,22 @@ export interface Product {
     brand: string;
     price: bigint;
 }
+export interface Enquiry {
+    id: bigint;
+    name: string;
+    createdAt: bigint;
+    message: string;
+    phone: string;
+}
 export interface backendInterface {
     addProduct(password: string, product: Product): Promise<boolean>;
     checkAdminPassword(password: string): Promise<boolean>;
+    deleteEnquiry(password: string, id: bigint): Promise<boolean>;
     deleteProduct(password: string, id: bigint): Promise<boolean>;
+    getEnquiries(password: string): Promise<Array<Enquiry>>;
     getProduct(id: bigint): Promise<Product | null>;
     getProducts(): Promise<Array<Product>>;
     seedProducts(password: string): Promise<boolean>;
+    submitEnquiry(name: string, phone: string, message: string): Promise<bigint>;
     updateProduct(password: string, id: bigint, product: Product): Promise<boolean>;
 }

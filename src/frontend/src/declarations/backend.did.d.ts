@@ -10,6 +10,13 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Enquiry {
+  'id' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'message' : string,
+  'phone' : string,
+}
 export interface Product {
   'id' : bigint,
   'name' : string,
@@ -49,10 +56,13 @@ export interface _SERVICE {
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   'addProduct' : ActorMethod<[string, Product], boolean>,
   'checkAdminPassword' : ActorMethod<[string], boolean>,
+  'deleteEnquiry' : ActorMethod<[string, bigint], boolean>,
   'deleteProduct' : ActorMethod<[string, bigint], boolean>,
+  'getEnquiries' : ActorMethod<[string], Array<Enquiry>>,
   'getProduct' : ActorMethod<[bigint], [] | [Product]>,
   'getProducts' : ActorMethod<[], Array<Product>>,
   'seedProducts' : ActorMethod<[string], boolean>,
+  'submitEnquiry' : ActorMethod<[string, string, string], bigint>,
   'updateProduct' : ActorMethod<[string, bigint, Product], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;

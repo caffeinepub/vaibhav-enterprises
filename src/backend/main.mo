@@ -1,9 +1,12 @@
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Text "mo:core/Text";
+import Int "mo:core/Int";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   include MixinStorage();
 
@@ -18,16 +21,28 @@ actor {
     imageUrl : Text;
   };
 
+  type Enquiry = {
+    id : Nat;
+    name : Text;
+    phone : Text;
+    message : Text;
+    createdAt : Int;
+  };
+
   // Stable storage — survives every redeploy
   stable var stableProducts : [(Nat, Product)] = [];
   stable var nextId : Nat = 1;
+  stable var stableEnquiries : [(Nat, Enquiry)] = [];
+  stable var nextEnquiryId : Nat = 1;
 
-  // In-memory map rebuilt from stable storage on startup
+  // In-memory maps rebuilt from stable storage on startup
   var products : Map.Map<Nat, Product> = Map.empty<Nat, Product>();
+  var enquiries : Map.Map<Nat, Enquiry> = Map.empty<Nat, Enquiry>();
 
   // Save to stable before upgrade
   system func preupgrade() {
     stableProducts := products.entries().toArray();
+    stableEnquiries := enquiries.entries().toArray();
   };
 
   // Restore from stable after upgrade
@@ -36,20 +51,24 @@ actor {
       products.add(k, v);
     };
     stableProducts := [];
+    for ((k, v) in stableEnquiries.vals()) {
+      enquiries.add(k, v);
+    };
+    stableEnquiries := [];
   };
 
-  public shared func checkAdminPassword(password : Text) : async Bool {
+  public shared ({ caller }) func checkAdminPassword(password : Text) : async Bool {
     password == "vaibhav@2210";
   };
 
-  public shared func addProduct(password : Text, product : Product) : async Bool {
+  public shared ({ caller }) func addProduct(password : Text, product : Product) : async Bool {
     if (password != "vaibhav@2210") return false;
     products.add(nextId, { product with id = nextId });
     nextId += 1;
     true;
   };
 
-  public shared func updateProduct(password : Text, id : Nat, product : Product) : async Bool {
+  public shared ({ caller }) func updateProduct(password : Text, id : Nat, product : Product) : async Bool {
     if (password != "vaibhav@2210") return false;
     switch (products.get(id)) {
       case (null) { false };
@@ -60,7 +79,7 @@ actor {
     };
   };
 
-  public shared func deleteProduct(password : Text, id : Nat) : async Bool {
+  public shared ({ caller }) func deleteProduct(password : Text, id : Nat) : async Bool {
     if (password != "vaibhav@2210") return false;
     if (products.containsKey(id)) {
       products.remove(id);
@@ -70,15 +89,39 @@ actor {
     };
   };
 
-  public query func getProducts() : async [Product] {
+  public query ({ caller }) func getProducts() : async [Product] {
     products.values().toArray();
   };
 
-  public query func getProduct(id : Nat) : async ?Product {
+  public query ({ caller }) func getProduct(id : Nat) : async ?Product {
     products.get(id);
   };
 
-  public shared func seedProducts(password : Text) : async Bool {
+  // ── Enquiries ──────────────────────────────────────────────────────────────
+
+  public shared ({ caller }) func submitEnquiry(name : Text, phone : Text, message : Text) : async Nat {
+    let id = nextEnquiryId;
+    enquiries.add(id, { id; name; phone; message; createdAt = 0 });
+    nextEnquiryId += 1;
+    id;
+  };
+
+  public shared ({ caller }) func getEnquiries(password : Text) : async [Enquiry] {
+    if (password != "vaibhav@2210") return [];
+    enquiries.values().toArray();
+  };
+
+  public shared ({ caller }) func deleteEnquiry(password : Text, id : Nat) : async Bool {
+    if (password != "vaibhav@2210") return false;
+    if (enquiries.containsKey(id)) {
+      enquiries.remove(id);
+      true;
+    } else {
+      false;
+    };
+  };
+
+  public shared ({ caller }) func seedProducts(password : Text) : async Bool {
     if (password != "vaibhav@2210") return false;
 
     type RawProduct = {
@@ -96,7 +139,6 @@ actor {
       { name = "Halonix LED Bulb 9W"; brand = "Halonix"; category = "Lights"; price = 120; badge = "Bestseller"; description = "Energy saving LED bulb."; imageUrl = "" },
       { name = "Halonix Panel Light"; brand = "Halonix"; category = "Lights"; price = 599; badge = "Sale"; description = "LED panel light."; imageUrl = "" },
       { name = "Pigeon Mixer Grinder"; brand = "Pigeon"; category = "Home Appliances"; price = 2200; badge = "Bestseller"; description = "3 jar mixer grinder."; imageUrl = "" },
-      { name = "Prestige Electric Kettle"; brand = "Prestige"; category = "Home Appliances"; price = 1499; badge = "Quick Seller"; description = "Fast boiling kettle."; imageUrl = "" },
       { name = "Varmora Storage Container Set"; brand = "Varmora"; category = "Varmora Plastic Items"; price = 950; badge = "Kitchen Essential"; description = "Airtight plastic containers."; imageUrl = "" },
       { name = "Varmora Water Jug"; brand = "Varmora"; category = "Varmora Plastic Items"; price = 350; badge = "Summer Special"; description = "Leak proof water jug."; imageUrl = "" },
     ];
