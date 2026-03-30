@@ -1,7 +1,7 @@
 # Vaibhav Enterprises
 
 ## Current State
-Backend imports `mo:core/Map` and uses it in `preupgrade`/`postupgrade` hooks with `.entries().toArray()` and `.add()` calls. If these methods trap at runtime the canister upgrade is aborted and `productList`/`enquiryList` data is lost on every redeploy. Products added via admin panel don't persist and enquiries submitted on the site don't appear in the admin inbox.
+Business website with admin panel, enquiry form, stock system, brand logos, and product management. Backend uses stable arrays for storage. Products and enquiries are still not visible across devices.
 
 ## Requested Changes (Diff)
 
@@ -9,15 +9,16 @@ Backend imports `mo:core/Map` and uses it in `preupgrade`/`postupgrade` hooks wi
 - Nothing new
 
 ### Modify
-- Rewrite backend `main.mo`: remove ALL `mo:core` imports and Map usage, remove complex preupgrade/postupgrade hooks, use ONLY stable arrays and `mo:base` library
-- Simplify preupgrade/postupgrade to only copy stable vars that are actually used
+- `getProducts()` changed from `public query` to `public shared` (update call) so all devices read from consensus-committed state instead of a potentially stale replica
+- `getProduct()` changed from `public query` to `public shared` for the same reason
+- `getProductStock()` and `getAllStock()` changed from query to update calls
+- Removed `mo:core/Map` import and associated non-stable map variables entirely (they were unused for actual storage but could cause upgrade hook interference)
 
 ### Remove
-- `mo:core/Map` import and all Map-related variables and operations from backend
-- Complex migration logic in postupgrade that could trap
+- `import Map "mo:core/Map"` and the three non-stable `var products`, `var enquiries`, `var stockMap` Map variables
 
 ## Implementation Plan
-1. Rewrite `src/backend/main.mo` using only `mo:base/Array`, `mo:base/Time` — no mo:core
-2. Keep stable vars: `productList`, `enquiryList`, `nextId`, `nextEnquiryId`
-3. Remove preupgrade/postupgrade entirely (not needed when only stable primitives are used)
-4. Keep all public function signatures identical so frontend bindings stay valid
+1. Rewrite backend/main.mo without mo:core dependency, using only mo:base
+2. Change all read functions to update calls for consistent cross-device state
+3. Keep all stable variable names identical to avoid M0169 upgrade errors
+4. Deploy

@@ -41,37 +41,48 @@ actor {
 
   let ADMIN_PW = "vaibhav@2210";
 
-  // ── Kept for upgrade compatibility (implicitly stable via mo:core/Map) ────
-  // DO NOT REMOVE — removing these causes M0169 compatibility errors.
+  // These MUST stay for upgrade compatibility (M0169). Do not remove.
   var products : Map.Map<Nat, OldProduct> = Map.empty<Nat, OldProduct>();
   var enquiries : Map.Map<Nat, Enquiry> = Map.empty<Nat, Enquiry>();
   var stockMap : Map.Map<Nat, Nat> = Map.empty<Nat, Nat>();
 
-  // ── Kept for upgrade compatibility (stable arrays from previous versions) ─
+  // Kept for upgrade compatibility with earlier stable array versions
   stable var stableProducts : [(Nat, OldProduct)] = [];
   stable var stableEnquiries : [(Nat, Enquiry)] = [];
   stable var stableStockMap : [(Nat, Nat)] = [];
   stable var migrated : Bool = true;
 
-  // ── ID counters ───────────────────────────────────────────────────────────
+  // ID counters
   stable var nextId : Nat = 1;
   stable var nextEnquiryId : Nat = 1;
 
-  // ── Real persistent storage ───────────────────────────────────────────────
+  // Actual persistent storage -- simple stable arrays
   stable var productList : [Product] = [];
   stable var enquiryList : [Enquiry] = [];
 
-  // ── Admin ─────────────────────────────────────────────────────────────────
+  // Admin
   public shared func checkAdminPassword(password : Text) : async Bool {
     password == ADMIN_PW
   };
 
-  // ── Products ──────────────────────────────────────────────────────────────
+  // Products
   public shared func addProduct(password : Text, product : Product) : async Bool {
     if (password != ADMIN_PW) { return false };
     let id = nextId;
     nextId += 1;
-    productList := Array.append(productList, [{ product with id }]);
+    let newProduct : Product = {
+      id;
+      name = product.name;
+      brand = product.brand;
+      category = product.category;
+      price = product.price;
+      badge = product.badge;
+      description = product.description;
+      imageUrl = product.imageUrl;
+      stockQty = product.stockQty;
+      inStock = product.inStock;
+    };
+    productList := Array.append<Product>(productList, [newProduct]);
     true
   };
 
@@ -79,7 +90,21 @@ actor {
     if (password != ADMIN_PW) { return false };
     var found = false;
     productList := Array.map<Product, Product>(productList, func(p) {
-      if (p.id == id) { found := true; { product with id } } else { p }
+      if (p.id == id) {
+        found := true;
+        {
+          id;
+          name = product.name;
+          brand = product.brand;
+          category = product.category;
+          price = product.price;
+          badge = product.badge;
+          description = product.description;
+          imageUrl = product.imageUrl;
+          stockQty = product.stockQty;
+          inStock = product.inStock;
+        }
+      } else { p }
     });
     found
   };
@@ -91,40 +116,54 @@ actor {
     productList.size() < before
   };
 
-  public query func getProducts() : async [Product] {
+  // Update call (not query) -- ensures all devices read from committed state
+  public shared func getProducts() : async [Product] {
     productList
   };
 
-  public query func getProduct(id : Nat) : async ?Product {
+  public shared func getProduct(id : Nat) : async ?Product {
     Array.find<Product>(productList, func(p) { p.id == id })
   };
 
-  // ── Stock ─────────────────────────────────────────────────────────────────
+  // Stock
   public shared func setProductStock(password : Text, id : Nat, quantity : Nat) : async Bool {
     if (password != ADMIN_PW) { return false };
     productList := Array.map<Product, Product>(productList, func(p) {
-      if (p.id == id) { { p with stockQty = quantity; inStock = quantity > 0 } } else { p }
+      if (p.id == id) {
+        {
+          id = p.id;
+          name = p.name;
+          brand = p.brand;
+          category = p.category;
+          price = p.price;
+          badge = p.badge;
+          description = p.description;
+          imageUrl = p.imageUrl;
+          stockQty = quantity;
+          inStock = quantity > 0;
+        }
+      } else { p }
     });
     true
   };
 
-  public query func getProductStock(id : Nat) : async Nat {
+  public shared func getProductStock(id : Nat) : async Nat {
     switch (Array.find<Product>(productList, func(p) { p.id == id })) {
       case (?p) { p.stockQty };
       case null { 0 };
     }
   };
 
-  public query func getAllStock() : async [(Nat, Nat)] {
+  public shared func getAllStock() : async [(Nat, Nat)] {
     Array.map<Product, (Nat, Nat)>(productList, func(p) { (p.id, p.stockQty) })
   };
 
-  // ── Enquiries ─────────────────────────────────────────────────────────────
+  // Enquiries -- update call so admin sees all submissions
   public shared func submitEnquiry(name : Text, phone : Text, message : Text) : async Nat {
     let id = nextEnquiryId;
     nextEnquiryId += 1;
     let e : Enquiry = { id; name; phone; message; createdAt = Time.now() };
-    enquiryList := Array.append(enquiryList, [e]);
+    enquiryList := Array.append<Enquiry>(enquiryList, [e]);
     id
   };
 
@@ -140,7 +179,7 @@ actor {
     enquiryList.size() < before
   };
 
-  // ── Seed (only if empty) ──────────────────────────────────────────────────
+  // Seed (only if empty)
   public shared func seedProducts(password : Text) : async Bool {
     if (password != ADMIN_PW) { return false };
     if (productList.size() > 0) { return false };
