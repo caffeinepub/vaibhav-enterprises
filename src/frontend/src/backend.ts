@@ -98,6 +98,8 @@ export interface Product {
     badge: string;
     brand: string;
     price: bigint;
+    stockQty: bigint;
+    inStock: boolean;
 }
 export interface _CaffeineStorageCreateCertificateResult {
     method: string;

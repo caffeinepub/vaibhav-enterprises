@@ -226,12 +226,10 @@ function ProductCard({
   product,
   index,
   onEnquire,
-  stockQty,
 }: {
   product: Product;
   index: number;
   onEnquire: (name: string) => void;
-  stockQty?: number;
 }) {
   const fallback = getCategoryFallback(product.category);
   const src =
@@ -292,19 +290,17 @@ function ProductCard({
             Enquire
           </Button>
         </div>
-        {stockQty !== undefined && (
-          <div className="mt-2">
-            {stockQty === 0 ? (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">
-                Out of Stock
-              </span>
-            ) : (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                In Stock · {stockQty} pcs
-              </span>
-            )}
-          </div>
-        )}
+        <div className="mt-2">
+          {!product.inStock || Number(product.stockQty) === 0 ? (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-600">
+              Out of Stock
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+              In Stock · {Number(product.stockQty)} pcs
+            </span>
+          )}
+        </div>
       </div>
     </motion.div>
   );
@@ -321,22 +317,12 @@ function MainSite() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [stockMap, setStockMap] = useState<Map<number, number>>(new Map());
-
   const fetchProducts = useCallback(async () => {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      const [productList, stockData] = await Promise.all([
-        actor.getProducts(),
-        actor.getAllStock().catch(() => [] as [bigint, bigint][]),
-      ]);
+      const productList = await actor.getProducts();
       setProducts(productList);
-      const map = new Map<number, number>();
-      for (const [id, qty] of stockData) {
-        map.set(Number(id), Number(qty));
-      }
-      setStockMap(map);
     } catch {
       // silently fail
     } finally {
@@ -845,7 +831,6 @@ function MainSite() {
                   product={product}
                   index={i}
                   onEnquire={handleAddToCart}
-                  stockQty={stockMap.get(Number(product.id))}
                 />
               ))}
             </div>

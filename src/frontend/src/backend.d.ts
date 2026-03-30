@@ -16,6 +16,8 @@ export interface Product {
     badge: string;
     brand: string;
     price: bigint;
+    stockQty: bigint;
+    inStock: boolean;
 }
 export interface Enquiry {
     id: bigint;

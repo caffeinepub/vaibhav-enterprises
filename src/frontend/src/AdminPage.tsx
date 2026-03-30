@@ -107,8 +107,6 @@ export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [seedLoading, setSeedLoading] = useState(false);
-  const [stockMap, setStockMap] = useState<Record<string, number>>({});
-
   // Product dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
@@ -134,16 +132,8 @@ export default function AdminPage() {
     if (!actor) return;
     setLoadingProducts(true);
     try {
-      const [data, stockData] = await Promise.all([
-        actor.getProducts(),
-        actor.getAllStock().catch(() => [] as [bigint, bigint][]),
-      ]);
+      const data = await actor.getProducts();
       setProducts(data);
-      const map: Record<string, number> = {};
-      for (const [id, qty] of stockData) {
-        map[id.toString()] = Number(qty);
-      }
-      setStockMap(map);
     } catch {
       toast.error("Failed to load products");
     } finally {
@@ -225,7 +215,6 @@ export default function AdminPage() {
     sessionStorage.removeItem("adminPassword");
     setIsLoggedIn(false);
     setProducts([]);
-    setStockMap({});
   };
 
   const handleSeed = async () => {
@@ -258,7 +247,7 @@ export default function AdminPage() {
       badge: product.badge,
       description: product.description,
       imageUrl: product.imageUrl,
-      stockQty: (stockMap[product.id.toString()] ?? 0).toString(),
+      stockQty: product.stockQty.toString(),
     });
     setDialogOpen(true);
   };
@@ -282,34 +271,15 @@ export default function AdminPage() {
       badge: formData.badge.trim(),
       description: formData.description.trim(),
       imageUrl: finalImageUrl,
+      stockQty: BigInt(Math.round(Number(formData.stockQty) || 0)),
+      inStock: Math.round(Number(formData.stockQty) || 0) > 0,
     };
     try {
       if (editProduct) {
         await actor.updateProduct(pwd, editProduct.id, productData);
-        await actor.setProductStock(
-          pwd,
-          editProduct.id,
-          BigInt(Number(formData.stockQty) || 0),
-        );
         toast.success("Product updated!");
       } else {
         await actor.addProduct(pwd, productData);
-        // Get the new product's id and set stock
-        try {
-          const allProducts = await actor.getProducts();
-          if (allProducts.length > 0) {
-            const newProduct = allProducts.reduce((a, b) =>
-              a.id > b.id ? a : b,
-            );
-            await actor.setProductStock(
-              pwd,
-              newProduct.id,
-              BigInt(Number(formData.stockQty) || 0),
-            );
-          }
-        } catch {
-          // Stock set failed but product was saved - non-fatal
-        }
         toast.success("Product added!");
       }
       setDialogOpen(false);
@@ -631,7 +601,6 @@ export default function AdminPage() {
                     </TableHeader>
                     <TableBody>
                       {products.map((product, i) => {
-                        const qty = stockMap[product.id.toString()] ?? 0;
                         return (
                           <TableRow
                             key={product.id.toString()}
@@ -673,10 +642,11 @@ export default function AdminPage() {
                               )}
                             </TableCell>
                             <TableCell>
-                              {qty > 0 ? (
+                              {product.inStock &&
+                              Number(product.stockQty) > 0 ? (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 border border-green-200 rounded-full px-2.5 py-0.5">
                                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                                  {qty} pcs
+                                  {Number(product.stockQty)} pcs
                                 </span>
                               ) : (
                                 <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-2.5 py-0.5">
