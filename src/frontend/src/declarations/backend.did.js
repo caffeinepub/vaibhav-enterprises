@@ -67,7 +67,7 @@ export const idlService = IDL.Service({
     ),
   '_caffeineStorageUpdateGatewayPrincipals' : IDL.Func([], [], []),
   'addProduct' : IDL.Func([IDL.Text, Product], [IDL.Bool], []),
-  'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'checkAdminPassword' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'deleteEnquiry' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'deleteProduct' : IDL.Func([IDL.Text, IDL.Nat], [IDL.Bool], []),
   'getAllStock' : IDL.Func(
@@ -75,7 +75,7 @@ export const idlService = IDL.Service({
       [IDL.Vec(IDL.Tuple(IDL.Nat, IDL.Nat))],
       ['query'],
     ),
-  'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], []),
+  'getEnquiries' : IDL.Func([IDL.Text], [IDL.Vec(Enquiry)], ['query']),
   'getProduct' : IDL.Func([IDL.Nat], [IDL.Opt(Product)], ['query']),
   'getProductStock' : IDL.Func([IDL.Nat], [IDL.Nat], ['query']),
   'getProducts' : IDL.Func([], [IDL.Vec(Product)], ['query']),
