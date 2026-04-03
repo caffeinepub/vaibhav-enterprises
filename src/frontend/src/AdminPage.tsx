@@ -454,7 +454,7 @@ export default function AdminPage() {
           value={activeTab}
           onValueChange={(v) => {
             setActiveTab(v);
-            if (v === "enquiries" && !loadingEnquiries) {
+            if (v === "enquiries") {
               fetchEnquiries();
             }
           }}

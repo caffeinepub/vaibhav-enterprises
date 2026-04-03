@@ -1,24 +1,26 @@
 # Vaibhav Enterprises
 
 ## Current State
-Business website with admin panel, enquiry form, stock system, brand logos, and product management. Backend uses stable arrays for storage. Products and enquiries are still not visible across devices.
+- Backend has `getProducts()` as a `query` call — returns stale data from a single replica, so products added via admin don't show on other devices
+- `getEnquiries()` is also a `query` call — same stale data issue
+- AdminPage: `fetchEnquiries` is never called automatically when switching to the Enquiries tab — only triggered by a manual refresh button click
+- Both issues cause the user to see empty/stale products and no enquiries in the admin panel
 
 ## Requested Changes (Diff)
 
 ### Add
-- Nothing new
+- Nothing new to add
 
 ### Modify
-- `getProducts()` changed from `public query` to `public shared` (update call) so all devices read from consensus-committed state instead of a potentially stale replica
-- `getProduct()` changed from `public query` to `public shared` for the same reason
-- `getProductStock()` and `getAllStock()` changed from query to update calls
-- Removed `mo:core/Map` import and associated non-stable map variables entirely (they were unused for actual storage but could cause upgrade hook interference)
+- `src/backend/main.mo`: Change `getProducts()` from `query` to `shared` (update call) so it always returns committed state
+- `src/backend/main.mo`: Change `getEnquiries()` from `query` to `shared` (update call) for same reason
+- `src/frontend/src/declarations/backend.did.js`: Remove `'query'` annotation from `getProducts` and `getEnquiries` IDL entries
+- `src/frontend/src/AdminPage.tsx`: Call `fetchEnquiries()` automatically whenever the Enquiries tab is activated (not just on manual refresh)
 
 ### Remove
-- `import Map "mo:core/Map"` and the three non-stable `var products`, `var enquiries`, `var stockMap` Map variables
+- Nothing to remove
 
 ## Implementation Plan
-1. Rewrite backend/main.mo without mo:core dependency, using only mo:base
-2. Change all read functions to update calls for consistent cross-device state
-3. Keep all stable variable names identical to avoid M0169 upgrade errors
-4. Deploy
+1. Change `getProducts` and `getEnquiries` in main.mo from `public query func` to `public shared func`
+2. Update `backend.did.js` IDL — remove `['query']` annotation from both methods
+3. Update `AdminPage.tsx` — add `fetchEnquiries()` call in the tab switch handler when switching to enquiries tab

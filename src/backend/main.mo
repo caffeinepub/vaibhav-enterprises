@@ -42,9 +42,6 @@ actor {
   let ADMIN_PW = "vaibhav@2210";
 
   // ── Compatibility stubs (M0169) ───────────────────────────────────────────
-  // These stable vars existed in older deployed versions and MUST remain to
-  // allow upgrades. They are unused — actual data lives in productList /
-  // enquiryList below.
   stable var products     : Map.Map<Nat, OldProduct> = Map.empty<Nat, OldProduct>();
   stable var enquiries    : Map.Map<Nat, Enquiry>    = Map.empty<Nat, Enquiry>();
   stable var stockMap     : Map.Map<Nat, Nat>        = Map.empty<Nat, Nat>();
@@ -66,11 +63,12 @@ actor {
   };
 
   // ── Products ──────────────────────────────────────────────────────────────
-  public query func getProducts() : async [Product] {
+  // update call (not query) so it always reads committed state across all replicas
+  public shared func getProducts() : async [Product] {
     productList
   };
 
-  public query func getProduct(id : Nat) : async ?Product {
+  public shared func getProduct(id : Nat) : async ?Product {
     Array.find<Product>(productList, func(p) { p.id == id })
   };
 
@@ -127,14 +125,14 @@ actor {
     true
   };
 
-  public query func getProductStock(id : Nat) : async Nat {
+  public shared func getProductStock(id : Nat) : async Nat {
     switch (Array.find<Product>(productList, func(p) { p.id == id })) {
       case (?p) { p.stockQty };
       case null  { 0 };
     }
   };
 
-  public query func getAllStock() : async [(Nat, Nat)] {
+  public shared func getAllStock() : async [(Nat, Nat)] {
     Array.map<Product, (Nat, Nat)>(productList, func(p) { (p.id, p.stockQty) })
   };
 
@@ -148,7 +146,8 @@ actor {
     id
   };
 
-  public query func getEnquiries(password : Text) : async [Enquiry] {
+  // update call (not query) so enquiries are always current
+  public shared func getEnquiries(password : Text) : async [Enquiry] {
     if (password != ADMIN_PW) { return [] };
     enquiryList
   };
